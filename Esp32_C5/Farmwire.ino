@@ -11,7 +11,7 @@
   - PIR OUT       -> GPIO 10
   - RADAR 1 OUT   -> GPIO 4
   - RADAR 2 OUT   -> GPIO 5
-  - ALARM RELAY   -> GPIO 2
+  - ALARM RELAY   -> GPIO 1
   - BUZZER        -> GPIO 3
   - OLED SDA      -> GPIO 8
   - OLED SCL      -> GPIO 9
@@ -31,7 +31,7 @@
 #define RADAR_1_PIN 4
 #define RADAR_2_PIN 5
 #define ALARM_RELAY_PIN 2
-#define BUZZER_PIN 3 
+#define BUZZER_PIN 1 
 
 #define I2C_SDA 8
 #define I2C_SCL 9
@@ -100,6 +100,12 @@ void setup() {
   connectToWiFi();
   
   if (WiFi.status() == WL_CONNECTED) {
+    display.clearDisplay();
+    display.setCursor(0, 10);
+    display.println(F("WiFi OK. Waiting..."));
+    display.display();
+    delay(3000); // Give router 3 seconds to finalize routing
+
     checkForFirmwareUpdate();
   }
   
@@ -297,6 +303,7 @@ void checkForFirmwareUpdate() {
 String fetchLatestVersion() {
   WiFiClientSecure client;
   client.setInsecure(); // Skip certificate validation for GitHub
+  client.setTimeout(15000); // Increase socket timeout to 15s to allow slow handshakes
   
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -324,6 +331,7 @@ String fetchLatestVersion() {
 void downloadAndApplyFirmware() {
   WiFiClientSecure client;
   client.setInsecure(); 
+  client.setTimeout(15000); // Increase socket timeout to 15s
 
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
