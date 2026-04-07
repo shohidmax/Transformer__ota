@@ -1,0 +1,5 @@
+crate an  node js app 
+database mdb: 
+ relatime monotring using soket.io
+ realtime nonitoring 
+ 
