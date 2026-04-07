@@ -43,8 +43,8 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // --- OTA Configuration ---
-const char* firmwareUrl = "https://github.com/shohidmax/ems-partner-OTA/releases/download/emsota/ESP_OTA.ino.bin";
-const char* versionUrl = "https://raw.githubusercontent.com/shohidmax/ems-partner-OTA/refs/heads/main/version.txt";
+const char* firmwareUrl = "https://github.com/shohidmax/Transformer__ota/releases/download/transformerq/Transfer_Sec.ino.bin";
+const char* versionUrl = "https://raw.githubusercontent.com/shohidmax/Transformer__ota/refs/heads/main/Esp32_C5/virsion.txt";
 
 const char* currentFirmwareVersion = "1.0.0";
 const unsigned long updateCheckInterval = 5 * 60 * 1000; // 5 minutes
@@ -242,6 +242,7 @@ void connectToWiFi() {
   // Set a timeout so the ESP doesn't get stuck forever if WiFi goes down
   // After 3 minutes (180 seconds) it will exit setup and continue running as an offline alarm
   wm.setConfigPortalTimeout(180);
+  wm.setConnectTimeout(20); // Force it to timeout if the router connection hangs
 
   // This will try to connect to the last known network.
   // If it fails, it sets up an Access Point named "Transformer_AP" with password "admin123"
@@ -298,6 +299,9 @@ String fetchLatestVersion() {
   client.setInsecure(); // Skip certificate validation for GitHub
   
   HTTPClient http;
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.setTimeout(15000); // 15 seconds timeout to prevent premature drop
+  
   if (!http.begin(client, versionUrl)) {
     Serial.println("Unable to connect to Version URL");
     return "";
@@ -323,6 +327,7 @@ void downloadAndApplyFirmware() {
 
   HTTPClient http;
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.setTimeout(15000); // 15 seconds timeout 
   
   if (!http.begin(client, firmwareUrl)) {
      Serial.println("Unable to connect to Firmware URL");
