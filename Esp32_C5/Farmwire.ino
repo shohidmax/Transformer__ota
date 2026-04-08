@@ -347,6 +347,9 @@ void loop() {
 
     // Update OLED Display
     updateDisplay();
+    
+    // Push Data to Node.js Server
+    pushDataToServer();
   }
 
   // 6. Non-blocking Timer for OTA Checking (5 minutes)
@@ -365,6 +368,7 @@ void loop() {
 
 void updateDisplay() {
   display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
   
   // Header with IP
   display.setTextSize(1);
@@ -412,6 +416,38 @@ void updateDisplay() {
 }
 
 // ==========================================
+//             PUSH DATA TO SERVER API
+// ==========================================
+void pushDataToServer() {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
+    HTTPClient http;
+    http.setTimeout(4000); // 4-second timeout to avoid loop hanging
+    
+    // Webhook destination (Node.js Server)
+    String serverUrl = "https://transformer.maxapi.esp32.site/api/push-data"; 
+    
+    // Build JSON exactly like local handleData()
+    String json = "{";
+    json += "\"temp\":" + String(temperature) + ",";
+    json += "\"hum\":" + String(humidity) + ",";
+    json += "\"pir\":" + String(pirState) + ",";
+    json += "\"rdr1\":" + String(radar1State) + ",";
+    json += "\"rdr2\":" + String(radar2State) + ",";
+    json += "\"state\":" + String(securityState) + ",";
+    json += "\"wifi_ssid\":\"" + WiFi.SSID() + "\",";
+    json += "\"wifi_rssi\":" + String(WiFi.RSSI());
+    json += "}";
+
+    http.begin(secureClient, serverUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.POST(json);
+    http.end();
+  }
+}
+
+// ==========================================
 //             API CALL FUNCTION (Moved to Server)
 // ==========================================
 
@@ -421,6 +457,7 @@ void updateDisplay() {
 
 void connectToWiFi() {
   display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
   display.setCursor(0, 10);
   display.println(F("Connecting to WiFi.."));

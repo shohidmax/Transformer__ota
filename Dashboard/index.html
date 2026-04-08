@@ -114,7 +114,7 @@
 
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script>
     // --- SIMULATION LOGIC FOR LOCAL PREVIEW ---
     // This allows you to see the UI animations without the ESP32 connected.
@@ -186,7 +186,8 @@
         }
     }
 
-    const socket = io(); // Connect dynamically to the host that served the file
+    // Explicitly connect to the Main Server you provided
+    const socket = io("https://transformer.maxapi.esp32.site/");
 
     socket.on('connect', () => {
         console.log('Connected to Node.js server');

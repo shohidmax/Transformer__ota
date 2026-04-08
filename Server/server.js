@@ -60,37 +60,30 @@ async function triggerAlarmAPI() {
 }
 
 // ==========================================
-// METHOD 1: POLL DATA FROM ESP32 (Auto-fetch)
+// RECEIVE DATA FROM ESP32 (Webhook Push)
 // ==========================================
-setInterval(async () => {
-    try {
-        const response = await fetch(`${ESP32_IP}/data`);
-        if (response.ok) {
-            const data = await response.json();
-            data.isOnline = true; // Inject online flag
-            
-            // Check if alarm triggered (Transition from safe/warning to ALARM)
-            if (data.state === 2 && lastSecurityState !== 2) {
-                triggerAlarmAPI();
-            }
-            lastSecurityState = data.state;
+let onlineTimeout = null;
 
-            // Broadcast the real-time data
-            io.emit('sensorUpdate', data);
-        }
-    } catch (error) {
-        // ESP32 is offline or unreachable
-        io.emit('sensorUpdate', { isOnline: false });
-    }
-}, POLL_INTERVAL);
+const handleOffline = () => {
+    io.emit('sensorUpdate', { isOnline: false });
+};
 
-// ==========================================
-// METHOD 2: RECEIVE DATA FROM ESP32 (Webhook)
-// If you modify ESP32 to push data, it can send POST requests here
-// ==========================================
+// Auto-trigger offline on boot if no ESP connects
+onlineTimeout = setTimeout(handleOffline, 5000);
+
 app.post('/api/push-data', (req, res) => {
     const data = req.body;
-    console.log('Received Push from ESP32:', data);
+    data.isOnline = true;
+    
+    // Check if alarm triggered (Transition from safe/warning to ALARM)
+    if (data.state === 2 && lastSecurityState !== 2) {
+        triggerAlarmAPI();
+    }
+    lastSecurityState = data.state;
+
+    // Reset offline timeout
+    if (onlineTimeout) clearTimeout(onlineTimeout);
+    onlineTimeout = setTimeout(handleOffline, 5000); // 5 sec without push = offline
     
     // Broadcast data to all connected web clients instantly
     io.emit('sensorUpdate', data);
