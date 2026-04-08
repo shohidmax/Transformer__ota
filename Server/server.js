@@ -20,11 +20,12 @@ const ESP32_IP = "http://192.168.0.201";
 const POLL_INTERVAL = 1000; 
 const PHONE_NUMBERS = ["+8801793496030", "+8801724958474"];
 let lastSecurityState = 0;
+let lastBothRadarsTriggered = false;
 
 async function triggerAlarmAPI() {
     console.log("🚨 ALARM TRIGGERED! Executing Server-based API calls...");
-    const primaryUrl = "https://transformer.maxapi.esp32.site/api/broadcast";
-    const backupUrl = "https://transformerv2.espserver.site/api/broadcast";
+    const primaryUrl = "https://800lcall.espserver.site/api/broadcast";
+    const backupUrl = "https://sim800l.maxapi.esp32.site/api/broadcast";
     
     const payload = {
         user_id: "user123",
@@ -75,10 +76,13 @@ app.post('/api/push-data', (req, res) => {
     const data = req.body;
     data.isOnline = true;
     
-    // Check if alarm triggered (Transition from safe/warning to ALARM)
-    if (data.state === 2 && lastSecurityState !== 2) {
+    // Instant API logic: when both radars detect, call API immediately
+    let bothRadarsNow = (data.rdr1 == 1 && data.rdr2 == 1);
+    if (bothRadarsNow && !lastBothRadarsTriggered) {
         triggerAlarmAPI();
     }
+    lastBothRadarsTriggered = bothRadarsNow;
+    
     lastSecurityState = data.state;
 
     // Reset offline timeout

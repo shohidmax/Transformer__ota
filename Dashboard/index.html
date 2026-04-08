@@ -70,10 +70,6 @@
       <div class="card">
         <h2>🏃‍♂️ Sensor Status</h2>
         <div class="sensor-row">
-          <span class="sensor-name">📡 PIR (Long Range)</span>
-          <span id="pir" class="badge safe">CLEAR</span>
-        </div>
-        <div class="sensor-row">
           <span class="sensor-name">🎯 Radar 1 (Left)</span>
           <span id="rdr1" class="badge safe">CLEAR</span>
         </div>
@@ -139,7 +135,6 @@
           }
         };
         
-        updateUI("pir", data.pir);
         updateUI("rdr1", data.rdr1);
         updateUI("rdr2", data.rdr2);
 
@@ -166,7 +161,6 @@
         if (data.rdr1 && data.rdr2) cause = "Radar 1 & 2";
         else if (data.rdr1) cause = "Radar 1 (Left)";
         else if (data.rdr2) cause = "Radar 2 (Right)";
-        else if (data.pir) cause = "PIR";
 
         // Update System Status Card
         const statCard = document.getElementById("statusCard");

@@ -10,7 +10,6 @@
   - OLED Live Status Display
 
   Pins:
-  - PIR       : GPIO 10
   - RADAR 1   : GPIO 4
   - RADAR 2   : GPIO 5
   - RELAY     : GPIO 2
@@ -32,7 +31,6 @@
 #include <WiFiManager.h> 
 
 // --- Pin Definitions ---
-#define PIR_PIN 10
 #define RADAR_1_PIN 4
 #define RADAR_2_PIN 5
 #define ALARM_RELAY_PIN 2
@@ -65,7 +63,6 @@ unsigned long lastUpdateCheck = 0;
 // --- State Variables ---
 float humidity = 0.0;
 float temperature = 0.0;
-bool pirState = false;
 bool radar1State = false;
 bool radar2State = false;
 int securityState = 0; // 0 = Safe, 1 = Warning, 2 = Alarm
@@ -151,10 +148,6 @@ const char index_html[] PROGMEM = R"rawliteral(
       <div class="card">
         <h2>🏃‍♂️ Sensor Status</h2>
         <div class="sensor-row">
-          <span class="sensor-name">📡 PIR (Long Range)</span>
-          <span id="pir" class="badge safe">CLEAR</span>
-        </div>
-        <div class="sensor-row">
           <span class="sensor-name">🎯 Radar 1 (Left)</span>
           <span id="rdr1" class="badge safe">CLEAR</span>
         </div>
@@ -182,7 +175,6 @@ const char index_html[] PROGMEM = R"rawliteral(
           }
         };
         
-        updateUI("pir", data.pir);
         updateUI("rdr1", data.rdr1);
         updateUI("rdr2", data.rdr2);
 
@@ -226,7 +218,6 @@ void handleData() {
   String json = "{";
   json += "\"temp\":" + String(temperature) + ",";
   json += "\"hum\":" + String(humidity) + ",";
-  json += "\"pir\":" + String(pirState) + ",";
   json += "\"rdr1\":" + String(radar1State) + ",";
   json += "\"rdr2\":" + String(radar2State) + ",";
   json += "\"state\":" + String(securityState) + ",";
@@ -242,7 +233,6 @@ void setup() {
   delay(1000);
   
   // Initialize Pins
-  pinMode(PIR_PIN, INPUT);
   pinMode(RADAR_1_PIN, INPUT);
   pinMode(RADAR_2_PIN, INPUT);
   
@@ -288,12 +278,11 @@ void loop() {
   server.handleClient();
 
   // 2. Read Motion & Presence Sensors Instantly
-  pirState = digitalRead(PIR_PIN);
   radar1State = digitalRead(RADAR_1_PIN);
   radar2State = digitalRead(RADAR_2_PIN);
 
   // 3. Security Logic Evaluation (10-Sec Continuous Radar Check & Instant API)
-  if (radar1State || radar2State) {
+  if (radar1State && radar2State) {
     
     // Start the timer if it's the first time detecting
     if (radarDetectStartTime == 0) {
@@ -312,15 +301,8 @@ void loop() {
   } else {
     // Reset the timer immediately if target clears even for a moment
     radarDetectStartTime = 0; 
-
-    // Fallback to check PIR if radars are clear
-    if (pirState) {
-      securityState = 1; // WARNING
-      digitalWrite(ALARM_RELAY_PIN, LOW); // Keep siren off
-    } else {
-      securityState = 0; // SAFE
-      digitalWrite(ALARM_RELAY_PIN, LOW); // Siren off
-    }
+    securityState = 0; // SAFE
+    digitalWrite(ALARM_RELAY_PIN, LOW); // Siren off
   }
 
   // 4. Instant Buzzer Logic
@@ -433,7 +415,6 @@ void pushDataToServer() {
     String json = "{";
     json += "\"temp\":" + String(temperature) + ",";
     json += "\"hum\":" + String(humidity) + ",";
-    json += "\"pir\":" + String(pirState) + ",";
     json += "\"rdr1\":" + String(radar1State) + ",";
     json += "\"rdr2\":" + String(radar2State) + ",";
     json += "\"state\":" + String(securityState) + ",";
