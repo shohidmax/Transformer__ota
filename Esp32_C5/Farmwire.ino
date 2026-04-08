@@ -231,7 +231,8 @@ void handleData() {
   json += "\"rdr2\":" + String(radar2State) + ",";
   json += "\"state\":" + String(securityState) + ",";
   json += "\"wifi_ssid\":\"" + WiFi.SSID() + "\",";
-  json += "\"wifi_rssi\":" + String(WiFi.RSSI());
+  json += "\"wifi_rssi\":" + String(WiFi.RSSI()) + ",";
+  json += "\"wifi_ip\":\"" + WiFi.localIP().toString() + "\"";
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -437,7 +438,8 @@ void pushDataToServer() {
     json += "\"rdr2\":" + String(radar2State) + ",";
     json += "\"state\":" + String(securityState) + ",";
     json += "\"wifi_ssid\":\"" + WiFi.SSID() + "\",";
-    json += "\"wifi_rssi\":" + String(WiFi.RSSI());
+    json += "\"wifi_rssi\":" + String(WiFi.RSSI()) + ",";
+    json += "\"wifi_ip\":\"" + WiFi.localIP().toString() + "\"";
     json += "}";
 
     http.begin(secureClient, serverUrl);

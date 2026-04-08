@@ -97,6 +97,10 @@
             <div><span class="env-value" id="wifiRSSI" style="font-size: 1.5rem;">--</span><span class="env-unit">dBm</span></div>
             <div class="env-label">Signal</div>
           </div>
+          <div class="env-box">
+            <div><span class="env-value" id="wifiIP" style="font-size: 1.1rem;">--</span></div>
+            <div class="env-label">Local IP</div>
+          </div>
         </div>
       </div>
     </div>
@@ -154,6 +158,9 @@
         // Update Network Stats
         document.getElementById("wifiSSID").innerText = data.wifi_ssid || "N/A";
         document.getElementById("wifiRSSI").innerText = data.wifi_rssi !== undefined ? data.wifi_rssi : "--";
+        if(document.getElementById("wifiIP")) {
+            document.getElementById("wifiIP").innerText = data.wifi_ip || "--";
+        }
 
         let cause = "No motion";
         if (data.rdr1 && data.rdr2) cause = "Radar 1 & 2";
