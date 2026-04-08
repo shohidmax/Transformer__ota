@@ -425,7 +425,18 @@ void pushDataToServer() {
 
     http.begin(secureClient, serverUrl);
     http.addHeader("Content-Type", "application/json");
-    http.POST(json);
+    int httpResponseCode = http.POST(json);
+    
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      // Check if the server replied with a restart command
+      if (response.indexOf("\"command\":\"restart\"") > 0) {
+        Serial.println(F("Reboot command received from Server! Restarting..."));
+        delay(500);
+        ESP.restart();
+      }
+    }
+    
     http.end();
   }
 }

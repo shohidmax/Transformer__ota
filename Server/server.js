@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,7 +19,16 @@ app.use(express.static(path.join(__dirname, '../Dashboard')));
 // ==========================================
 const ESP32_IP = "http://192.168.0.201"; 
 const POLL_INTERVAL = 1000; 
-const PHONE_NUMBERS = ["+8801793496030", "+8801724958474"];
+let PHONE_NUMBERS = ["+8801793496030", "+8801724958474"];
+const NUMBERS_FILE = path.join(__dirname, 'numbers.json');
+
+try {
+    if (fs.existsSync(NUMBERS_FILE)) {
+        PHONE_NUMBERS = JSON.parse(fs.readFileSync(NUMBERS_FILE));
+    }
+} catch (e) {
+    console.log("Error loading numbers.json:", e.message);
+}
 let lastSecurityState = 0;
 let lastBothRadarsTriggered = false;
 
@@ -64,6 +74,7 @@ async function triggerAlarmAPI() {
 // RECEIVE DATA FROM ESP32 (Webhook Push)
 // ==========================================
 let onlineTimeout = null;
+let pendingCommand = null;
 
 const handleOffline = () => {
     io.emit('sensorUpdate', { isOnline: false });
@@ -91,7 +102,13 @@ app.post('/api/push-data', (req, res) => {
     
     // Broadcast data to all connected web clients instantly
     io.emit('sensorUpdate', data);
-    res.status(200).json({ status: "success" });
+    
+    let responseJson = { status: "success" };
+    if (pendingCommand) {
+        responseJson.command = pendingCommand;
+        pendingCommand = null;
+    }
+    res.status(200).json(responseJson);
 });
 
 // ==========================================
@@ -102,6 +119,23 @@ io.on('connection', (socket) => {
     
     socket.on('disconnect', () => {
         console.log(`🔴 Web Client Disconnected: ${socket.id}`);
+    });
+
+    // Send the current phone numbers array when client connects
+    socket.emit('initNumbers', PHONE_NUMBERS);
+    
+    // Listen for phone number updates from dashboard
+    socket.on('updateNumbers', (newNumbers) => {
+        PHONE_NUMBERS = newNumbers;
+        fs.writeFileSync(NUMBERS_FILE, JSON.stringify(PHONE_NUMBERS));
+        io.emit('initNumbers', PHONE_NUMBERS); // Sync across all open dashboards
+        console.log("Phone numbers updated:", PHONE_NUMBERS);
+    });
+
+    // Listen for manual ESP Reboot trigger from dashboard
+    socket.on('rebootESP', () => {
+        pendingCommand = "restart";
+        console.log("Reboot command queued for ESP32...");
     });
 });
 
