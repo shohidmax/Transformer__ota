@@ -82,7 +82,6 @@ void checkForFirmwareUpdate();
 String fetchLatestVersion();
 void downloadAndApplyFirmware();
 bool startOTAUpdate(WiFiClient* client, int contentLength);
-void triggerAlarmAPI(); // New API Function Prototype
 
 // --- HTML Premium Dashboard ---
 const char index_html[] PROGMEM = R"rawliteral(
@@ -230,7 +229,9 @@ void handleData() {
   json += "\"pir\":" + String(pirState) + ",";
   json += "\"rdr1\":" + String(radar1State) + ",";
   json += "\"rdr2\":" + String(radar2State) + ",";
-  json += "\"state\":" + String(securityState);
+  json += "\"state\":" + String(securityState) + ",";
+  json += "\"wifi_ssid\":\"" + WiFi.SSID() + "\",";
+  json += "\"wifi_rssi\":" + String(WiFi.RSSI());
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -296,9 +297,6 @@ void loop() {
     // Start the timer if it's the first time detecting
     if (radarDetectStartTime == 0) {
       radarDetectStartTime = millis(); 
-      
-      // IMMEDIATE API TRIGGER ON DETECTION
-      triggerAlarmAPI(); 
     }
 
     // Check if 10 seconds (10000 ms) have passed continuously
@@ -414,63 +412,8 @@ void updateDisplay() {
 }
 
 // ==========================================
-//             API CALL FUNCTION
+//             API CALL FUNCTION (Moved to Server)
 // ==========================================
-void triggerAlarmAPI() {
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(F("Triggering Alarm API (Primary)..."));
-    
-    WiFiClientSecure client;
-    client.setInsecure(); // Skip certificate validation
-    client.setTimeout(15000); // 15 seconds timeout to prevent Code -11
-    
-    HTTPClient http;
-    http.setTimeout(15000); // 15 seconds timeout to prevent Code -11
-    
-    String primaryUrl = "https://800lcall.espserver.site/api/broadcast";
-    String backupUrl = "https://sim800l.maxapi.esp32.site/api/broadcast";
-    
-    // Construct the payload JSON exactly as required
-    String jsonPayload = "{\"user_id\":\"user123\",\"mac\":\"44:1D:64:BD:22:EC\",\"phone\":\"Main Office\",\"phone_call_list\":[\"+8801793496030\",\"+8801724958474\"],\"payload\":{\"address\":\"pole55\",\"message\":\"Theft alarm detected \"},\"response\":[]}";
-
-    // --- Try Primary API ---
-    http.begin(client, primaryUrl);
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST(jsonPayload);
-
-    bool success = false;
-    if (httpResponseCode > 0 && httpResponseCode < 400) {
-      Serial.printf("Primary API Call Success, Response Code: %d\n", httpResponseCode);
-      String responseBody = http.getString();
-      Serial.println(responseBody);
-      success = true;
-    } else {
-      Serial.printf("Primary API Call Error: %s (Code: %d)\n", http.errorToString(httpResponseCode).c_str(), httpResponseCode);
-    }
-    http.end();
-
-    // --- Try Backup API if Primary Fails ---
-    if (!success) {
-      Serial.println(F("Switching to Backup API..."));
-      http.begin(client, backupUrl);
-      http.addHeader("Content-Type", "application/json");
-      
-      httpResponseCode = http.POST(jsonPayload);
-      
-      if (httpResponseCode > 0) {
-        Serial.printf("Backup API Call Success, Response Code: %d\n", httpResponseCode);
-        String responseBody = http.getString();
-        Serial.println(responseBody);
-      } else {
-        Serial.printf("Backup API Call Error: %s (Code: %d)\n", http.errorToString(httpResponseCode).c_str(), httpResponseCode);
-      }
-      http.end();
-    }
-    
-  } else {
-    Serial.println(F("WiFi not connected. Cannot trigger API."));
-  }
-}
 
 // ==========================================
 //             OTA & WIFI FUNCTIONS

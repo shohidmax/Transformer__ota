@@ -46,7 +46,7 @@
   <div class="container">
     <div class="header">
       <h1>🛡️ Transformer Security</h1>
-      <p>Real-time Monitoring & OTA System</p>
+      <p>Real-time Monitoring & OTA System | <span id="onlineBadge" class="badge alert">🔴 ESP OFFLINE</span></p>
     </div>
     
     <div id="statusCard">
@@ -80,6 +80,23 @@
         <div class="sensor-row">
           <span class="sensor-name">🎯 Radar 2 (Right)</span>
           <span id="rdr2" class="badge safe">CLEAR</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="grid">
+      <!-- Network Card -->
+      <div class="card">
+        <h2>📶 Network Status</h2>
+        <div class="env-data">
+          <div class="env-box">
+            <div><span class="env-value" id="wifiSSID" style="font-size: 1.2rem;">--</span></div>
+            <div class="env-label">WiFi Name</div>
+          </div>
+          <div class="env-box">
+            <div><span class="env-value" id="wifiRSSI" style="font-size: 1.5rem;">--</span><span class="env-unit">dBm</span></div>
+            <div class="env-label">Signal</div>
+          </div>
         </div>
       </div>
     </div>
@@ -122,6 +139,28 @@
         updateUI("rdr1", data.rdr1);
         updateUI("rdr2", data.rdr2);
 
+        // Update Device Online Badge
+        const onlineBadge = document.getElementById("onlineBadge");
+        if (data.isOnline === false) {
+            onlineBadge.className = "badge alert";
+            onlineBadge.innerText = "🔴 ESP OFFLINE";
+            document.getElementById("sysStatusText").innerText = "❌ ESP UNREACHABLE";
+            return; // Stop processing further UI updates
+        } else {
+            onlineBadge.className = "badge safe";
+            onlineBadge.innerText = "🟢 ESP ONLINE";
+        }
+
+        // Update Network Stats
+        document.getElementById("wifiSSID").innerText = data.wifi_ssid || "N/A";
+        document.getElementById("wifiRSSI").innerText = data.wifi_rssi !== undefined ? data.wifi_rssi : "--";
+
+        let cause = "No motion";
+        if (data.rdr1 && data.rdr2) cause = "Radar 1 & 2";
+        else if (data.rdr1) cause = "Radar 1 (Left)";
+        else if (data.rdr2) cause = "Radar 2 (Right)";
+        else if (data.pir) cause = "PIR";
+
         // Update System Status Card
         const statCard = document.getElementById("statusCard");
         const statText = document.getElementById("sysStatusText");
@@ -131,13 +170,13 @@
             statCard.style.backgroundColor = "rgba(239, 68, 68, 0.05)";
             statCard.style.boxShadow = "0 0 20px rgba(239, 68, 68, 0.3)";
             statText.style.color = "var(--alert)";
-            statText.innerText = "🚨 ALARM ACTIVE!";
+            statText.innerText = "🚨 ALARM: " + cause;
         } else if (data.state === 1) {
             statCard.style.borderColor = "var(--warning)";
             statCard.style.backgroundColor = "rgba(245, 158, 11, 0.05)";
             statCard.style.boxShadow = "0 0 20px rgba(245, 158, 11, 0.3)";
             statText.style.color = "var(--warning)";
-            statText.innerText = "⚠️ WARNING (MOTION)";
+            statText.innerText = "⚠️ WARNING: " + cause;
         } else {
             statCard.style.borderColor = "rgba(16, 185, 129, 0.3)";
             statCard.style.backgroundColor = "rgba(16, 185, 129, 0.05)";
@@ -147,7 +186,7 @@
         }
     }
 
-    const socket = io();
+    const socket = io(); // Connect dynamically to the host that served the file
 
     socket.on('connect', () => {
         console.log('Connected to Node.js server');
@@ -167,6 +206,17 @@
     socket.on('sensorUpdate', (data) => {
         processData(data);
     }); 
+
+    // Simulation fallback if no real server data is pushed after a while
+    const simulationInterval = setInterval(() => {
+        if (!socket.connected) {
+            mockState = (mockState + 1) % 3;
+            processData({
+                temp: 35.0 + Math.random() * 2, hum: 60 + Math.random() * 5,
+                pir: mockState >= 1, rdr1: mockState === 2, rdr2: mockState === 2, state: mockState
+            });
+        }
+    }, 2500);
 
     // --- CAMERA PLAY LOGIC ---
     function playCamera() {

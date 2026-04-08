@@ -5,7 +5,7 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { cors: { origin: "*" } });
 
 // Middleware to parse JSON payloads
 app.use(express.json());
@@ -14,24 +14,73 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../Dashboard')));
 
 // ==========================================
-// METHOD 1: POLL DATA FROM ESP32 (Auto-fetch)
-// Node.js will automatically fetch data from ESP32 every 1 second
+// CONFIGURATION & PHONE VARIABLES
 // ==========================================
-const ESP32_IP = "http://192.168.0.201"; // ⚠️ Change this to your ESP32's current IP
-const POLL_INTERVAL = 1000; // 1 second
+const ESP32_IP = "http://192.168.0.201"; 
+const POLL_INTERVAL = 1000; 
+const PHONE_NUMBERS = ["+8801793496030", "+8801724958474"];
+let lastSecurityState = 0;
 
+async function triggerAlarmAPI() {
+    console.log("🚨 ALARM TRIGGERED! Executing Server-based API calls...");
+    const primaryUrl = "https://transformer.maxapi.esp32.site/api/broadcast";
+    const backupUrl = "https://transformerv2.espserver.site/api/broadcast";
+    
+    const payload = {
+        user_id: "user123",
+        mac: "44:1D:64:BD:22:EC",
+        phone: "Main Office",
+        phone_call_list: PHONE_NUMBERS,
+        payload: { address: "pole55", message: "Theft alarm detected " },
+        response: []
+    };
+
+    try {
+        let res = await fetch(primaryUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error("Primary API failed");
+        console.log("✅ Primary API Call Success");
+    } catch (e) {
+        console.log("⚠️ Switching to Backup API...", e.message);
+        try {
+            let res2 = await fetch(backupUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!res2.ok) throw new Error("Backup API failed");
+            console.log("✅ Backup API Call Success");
+        } catch (err) {
+            console.log("❌ Both APIs failed", err.message);
+        }
+    }
+}
+
+// ==========================================
+// METHOD 1: POLL DATA FROM ESP32 (Auto-fetch)
+// ==========================================
 setInterval(async () => {
     try {
-        // Only works if using Node.js v18+ (uses native fetch)
         const response = await fetch(`${ESP32_IP}/data`);
         if (response.ok) {
             const data = await response.json();
-            // Broadcast the real-time data to all connected web clients
+            data.isOnline = true; // Inject online flag
+            
+            // Check if alarm triggered (Transition from safe/warning to ALARM)
+            if (data.state === 2 && lastSecurityState !== 2) {
+                triggerAlarmAPI();
+            }
+            lastSecurityState = data.state;
+
+            // Broadcast the real-time data
             io.emit('sensorUpdate', data);
         }
     } catch (error) {
-        // Silently fail if ESP32 is offline to prevent console spam
-        // console.error(`ESP32 Offline: ${error.message}`);
+        // ESP32 is offline or unreachable
+        io.emit('sensorUpdate', { isOnline: false });
     }
 }, POLL_INTERVAL);
 
