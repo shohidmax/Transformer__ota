@@ -108,10 +108,11 @@
           
           <div class="space-y-4">
             <div class="bg-base-200 p-4 rounded-xl border border-base-300 flex justify-between items-center">
-              <div>
-                <p class="text-xs font-bold uppercase text-base-content/50 mb-1">Alert API Receivers</p>
-                <div class="font-mono text-sm" id="num1_display">Loading...</div>
-                <div class="font-mono text-sm" id="num2_display">Loading...</div>
+              <div class="flex-1 w-full overflow-hidden">
+                <p class="text-xs font-bold uppercase text-base-content/50 mb-1">Alert Receivers (<span id="num_count">0</span>/10)</p>
+                <div class="flex flex-col gap-1 max-h-24 overflow-y-auto pr-2" id="number_list_display">
+                    <div class="font-mono text-sm">Loading...</div>
+                </div>
               </div>
               <button onclick="document.getElementById('settings_modal').showModal()" class="btn btn-outline btn-warning btn-sm">Edit Numbers</button>
             </div>
@@ -119,6 +120,30 @@
             <button onclick="rebootESP()" class="btn btn-error w-full shadow-lg hover:shadow-error/50 font-bold uppercase tracking-wider text-xl h-auto py-3">
               ⏻ Reboot ESP32 Device
             </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LIVE CAMERA CARD -->
+      <div class="card bg-base-100 shadow-xl border border-white/5 lg:col-span-2">
+        <div class="card-body">
+          <div class="flex flex-col md:flex-row justify-between items-center mb-2">
+            <h2 class="card-title text-xl text-error"><span class="text-2xl">📹</span> Live Camera Feed</h2>
+            <button id="playCamBtn" onclick="toggleCamera()" class="btn btn-error btn-sm shadow-lg shadow-error/30 mt-2 md:mt-0">
+              ▶️ Play Stream
+            </button>
+          </div>
+          <div class="divider mt-0 mb-4"></div>
+          
+          <div id="camera_container" class="w-full bg-black rounded-xl overflow-hidden shadow-inner flex flex-col items-center justify-center border border-white/10 relative" style="display: none; aspect-ratio: 16/9; min-height: 250px;">
+            <div id="cam_loader" class="absolute z-10 flex flex-col items-center">
+              <span class="loading loading-spinner text-error loading-lg mb-2"></span>
+              <span class="text-xs font-mono text-error/70 tracking-widest">CONNECTING...</span>
+            </div>
+            <!-- Video -->
+            <video id="live_camera" class="w-full h-full object-contain relative z-20" controls muted playsinline>
+              <!-- Source will be injected via JS -->
+            </video>
           </div>
         </div>
       </div>
@@ -130,15 +155,12 @@
   <dialog id="settings_modal" class="modal modal-bottom sm:modal-middle">
     <div class="modal-box bg-base-200">
       <h3 class="font-bold text-2xl text-warning mb-4">Edit API Mobile Numbers</h3>
-      <div class="space-y-4 relative">
-        <label class="form-control w-full">
-          <div class="label"><span class="label-text font-bold">Primary Contact</span></div>
-          <input type="text" id="num1_input" placeholder="+8801..." class="input input-bordered input-warning w-full font-mono text-lg" />
-        </label>
-        <label class="form-control w-full">
-          <div class="label"><span class="label-text font-bold">Secondary Contact</span></div>
-          <input type="text" id="num2_input" placeholder="+8801..." class="input input-bordered input-warning w-full font-mono text-lg" />
-        </label>
+      <div class="space-y-4">
+        <p class="text-sm opacity-70">Add up to 10 phone numbers to receive theft alerts.</p>
+        <div id="numbers_edit_container" class="space-y-2 max-h-60 overflow-y-auto pr-2">
+            <!-- Inputs populated dynamically -->
+        </div>
+        <button id="add_Num_Btn" class="btn btn-outline btn-success btn-sm w-full mt-2" onclick="addNewNumberInput()">+ Add Another Number</button>
       </div>
       <div class="modal-action">
         <form method="dialog">
@@ -221,20 +243,68 @@
     });
 
     // Setup Admin Panel
+    let localNumbers = [];
+    
     socket.on('initNumbers', (nums) => {
-        document.getElementById('num1_display').innerText = nums[0] || "None";
-        document.getElementById('num2_display').innerText = nums[1] || "None";
-        document.getElementById('num1_input').value = nums[0] || "";
-        document.getElementById('num2_input').value = nums[1] || "";
+        localNumbers = nums || [];
+
+        // Update Dashboard Display
+        const listDisplay = document.getElementById('number_list_display');
+        document.getElementById('num_count').innerText = localNumbers.length;
+        if(localNumbers.length === 0) {
+            listDisplay.innerHTML = '<div class="text-xs opacity-50 italic">No numbers stored.</div>';
+        } else {
+            listDisplay.innerHTML = localNumbers.map(n => `<div class="font-mono text-sm flex items-center gap-2"><span class="text-secondary text-xs">📞</span> ${n}</div>`).join('');
+        }
+
+        // Populate Modal Editing Fields
+        renderEditList();
     });
 
-    // Save Numbers
+    function renderEditList() {
+        const container = document.getElementById('numbers_edit_container');
+        container.innerHTML = "";
+        
+        localNumbers.forEach((num, index) => {
+            const row = document.createElement("div");
+            row.className = "flex items-center gap-2";
+            row.innerHTML = `
+                <input type="text" value="${num}" id="num_input_${index}" class="input input-sm input-bordered input-warning w-full font-mono" placeholder="Enter number..." />
+                <button onclick="removeNumber(${index})" class="btn btn-error btn-sm btn-square p-1 text-lg mb-0 pb-0 flex items-center justify-center">🗑️</button>
+            `;
+            container.appendChild(row);
+        });
+        
+        // Hide/Show Add button based on 10 max limit
+        document.getElementById('add_Num_Btn').style.display = localNumbers.length >= 10 ? "none" : "block";
+    }
+
+    function removeNumber(index) {
+        syncLocalInputs(); // Sync changes before deleting
+        localNumbers.splice(index, 1);
+        renderEditList();
+    }
+
+    function addNewNumberInput() {
+        syncLocalInputs();
+        if(localNumbers.length < 10) {
+            localNumbers.push("");
+            renderEditList();
+        }
+    }
+
+    function syncLocalInputs() {
+        // Reads what user typed back into localNumbers array before re-rendering
+        localNumbers = localNumbers.map((_, i) => {
+            const inputEl = document.getElementById(`num_input_${i}`);
+            return inputEl ? inputEl.value.trim() : "";
+        });
+    }
+
     function saveNumbers() {
-        const n1 = document.getElementById('num1_input').value.trim();
-        const n2 = document.getElementById('num2_input').value.trim();
-        const validNumbers = [];
-        if(n1) validNumbers.push(n1);
-        if(n2) validNumbers.push(n2);
+        syncLocalInputs();
+        // Remove empty strings and max 10
+        const validNumbers = localNumbers.filter(n => n !== "").slice(0, 10);
         
         socket.emit('updateNumbers', validNumbers);
         document.getElementById('settings_modal').close();
@@ -248,6 +318,35 @@
             document.getElementById("sysStatusText").innerText = "🔄 REBOOTING...";
         }
     }
+
+    // Camera Toggle Action
+    function toggleCamera() {
+      const container = document.getElementById("camera_container");
+      const video = document.getElementById("live_camera");
+      const btn = document.getElementById("playCamBtn");
+      
+      if(container.style.display === "none") {
+        container.style.display = "flex";
+        video.src = "https://mycam.emspartner.site/api/stream.mp4?src=camera1&mp4=flac";
+        video.play().catch(e => console.log("Stream play error:", e));
+        btn.innerHTML = "⏹️ Stop Stream";
+        btn.className = "btn btn-outline btn-error btn-sm";
+      } else {
+        container.style.display = "none";
+        video.pause();
+        video.src = "";
+        btn.innerHTML = "▶️ Play Stream";
+        btn.className = "btn btn-error btn-sm shadow-lg shadow-error/30";
+      }
+    }
+
+    // Loader hiding when video has started playing
+    document.getElementById("live_camera").addEventListener('playing', () => {
+      document.getElementById("cam_loader").style.display = "none";
+    });
+    document.getElementById("live_camera").addEventListener('waiting', () => {
+      document.getElementById("cam_loader").style.display = "flex";
+    });
   </script>
 </body>
 </html>

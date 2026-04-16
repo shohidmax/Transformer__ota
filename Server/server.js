@@ -42,7 +42,7 @@ async function triggerAlarmAPI() {
         mac: "44:1D:64:BD:22:EC",
         phone: "Main Office",
         phone_call_list: PHONE_NUMBERS,
-        payload: { address: "pole55", message: "Theft alarm detected " },
+        payload: { address: "pole55", message: "Theft alarm detected ", "audio": "001" },
         response: []
     };
 
