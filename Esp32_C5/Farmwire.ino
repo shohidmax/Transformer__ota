@@ -408,8 +408,11 @@ void pushDataToServer() {
     HTTPClient http;
     http.setTimeout(4000); // 4-second timeout to avoid loop hanging
     
-    // Webhook destination (Node.js Server)
-    String serverUrl = "https://transformer.maxapi.esp32.site/api/push-data"; 
+    // Webhook destinations (Node.js Server)
+    String primaryUrl = "https://transformer.maxapi.esp32.site/api/push-data"; 
+    String backupUrl  = "https://transformer.maxapi.esp32.site/api/push-data"; 
+    
+    String serverUrl = primaryUrl; 
     
     // Build JSON exactly like local handleData()
     String json = "{";
@@ -427,6 +430,17 @@ void pushDataToServer() {
     http.addHeader("Content-Type", "application/json");
     int httpResponseCode = http.POST(json);
     
+    // Fallback logic
+    if (httpResponseCode <= 0) {
+      Serial.println(F("Primary server failed, trying backup server..."));
+      http.end(); // close previous connection
+      
+      serverUrl = backupUrl;
+      http.begin(secureClient, serverUrl);
+      http.addHeader("Content-Type", "application/json");
+      httpResponseCode = http.POST(json);
+    }
+    
     if (httpResponseCode > 0) {
       String response = http.getString();
       // Check if the server replied with a restart command
@@ -435,6 +449,8 @@ void pushDataToServer() {
         delay(500);
         ESP.restart();
       }
+    } else {
+      Serial.println(F("Data push failed on both Primary & Backup servers."));
     }
     
     http.end();

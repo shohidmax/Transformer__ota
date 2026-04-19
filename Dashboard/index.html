@@ -172,10 +172,23 @@
   </dialog>
 
   <script>
-    // Connection Setup
-    const socket = io("https://transformer.maxapi.esp32.site/");
+    // Connection Setup with Primary and Backup
+    const PRIMARY_SERVER = "https://transformer.maxapi.esp32.site/";
+    const BACKUP_SERVER = "https://transformer.maxapi.esp32.site/";
+    
+    const socket = io(PRIMARY_SERVER);
 
-    socket.on('connect', () => console.log('Connected to Node.js server'));
+    socket.on('connect', () => {
+        console.log('Connected to Node.js server at ' + socket.io.uri);
+    });
+
+    socket.io.on("reconnect_attempt", (attempt) => {
+        if (attempt % 3 === 0) {
+            console.log("Switching server due to repeated failures...");
+            socket.io.uri = (socket.io.uri === PRIMARY_SERVER) ? BACKUP_SERVER : PRIMARY_SERVER;
+        }
+    });
+
     socket.on('disconnect', () => {
       document.getElementById("onlineBadge").className = "badge badge-error badge-lg gap-2 font-bold shadow-lg";
       document.getElementById("onlineBadge").innerHTML = `<span class="w-2 h-2 rounded-full bg-current"></span> SERVER OFFLINE`;
