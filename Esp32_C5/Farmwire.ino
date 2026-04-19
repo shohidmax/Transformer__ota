@@ -410,7 +410,7 @@ void pushDataToServer() {
     
     // Webhook destinations (Node.js Server)
     String primaryUrl = "https://transformer.maxapi.esp32.site/api/push-data"; 
-    String backupUrl  = "https://transformer.maxapi.esp32.site/api/push-data"; 
+    String backupUrl  = "https://backupapitrans.espserver.site/api/push-data"; 
     
     String serverUrl = primaryUrl; 
     
